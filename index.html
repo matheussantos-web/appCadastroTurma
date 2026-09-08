@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cadastro da Turma</title>
+  
+  <!-- CDN do Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- CDN do Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-4 my-8">
+
+  <div class="bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-lg border border-slate-700">
+    <h1 class="text-2xl font-bold text-center mb-2 text-indigo-400">Cadastro da Turma</h1>
+    <p class="text-sm text-slate-400 text-center mb-6">Preencha suas informações para atualizar o portfólio da turma.</p>
+
+    <!-- Alertas de Feedback -->
+    <div id="alert-success" class="hidden mb-4 p-3 bg-emerald-500/10 border border-emerald-500/50 text-emerald-400 rounded-lg text-sm text-center">
+      Cadastro realizado com sucesso! 🎉
+    </div>
+    <div id="alert-error" class="hidden mb-4 p-3 bg-rose-500/10 border border-rose-500/50 text-rose-400 rounded-lg text-sm text-center">
+      Ocorreu um erro ao cadastrar. Tente novamente.
+    </div>
+
+    <!-- Formulário -->
+    <form id="signup-form" class="space-y-4">
+      <!-- Nome -->
+      <div>
+        <label for="nome" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Nome Completo</label>
+        <input type="text" id="nome" required placeholder="Ex: João Silva"
+          class="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-white placeholder-slate-500 transition">
+      </div>
+
+      <!-- Cargo / Função -->
+      <div>
+        <label for="cargo" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Cargo / Especialidade</label>
+        <input type="text" id="cargo" required placeholder="Ex: Desenvolvedor Front-end"
+          class="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-white placeholder-slate-500 transition">
+      </div>
+
+      <!-- Link do Currículo (Vercel) -->
+      <div>
+        <label for="link_curriculo" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Link do Currículo (Vercel)</label>
+        <input type="url" id="link_curriculo" required placeholder="https://meu-curriculo.vercel.app"
+          class="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-white placeholder-slate-500 transition">
+      </div>
+
+      <!-- Upload de Foto -->
+      <div>
+        <label for="foto" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Foto de Perfil</label>
+        <input type="file" id="foto" accept="image/*" required
+          class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 file:cursor-pointer border border-slate-700 rounded-lg bg-slate-900 p-1">
+      </div>
+
+      <!-- Botão Enviar -->
+      <button type="submit" id="btn-submit"
+        class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 font-semibold rounded-lg transition duration-200 text-white shadow-lg shadow-indigo-600/30 disabled:opacity-50 flex justify-center items-center">
+        <span>Finalizar Cadastro</span>
+      </button>
+    </form>
+  </div>
+
+  <script>
+    // 1. CONFIGURAÇÃO DO SUPABASE
+    const SUPABASE_URL = 'https://eempgprspimlhzlofvjx.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_H8eepB7xyJndr_TdsvuiVw_pJbsPC5k';
+
+    // Ajustado nome da variável para não conflitar com a biblioteca do global window
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: false // Desativa persistência do armazenamento para evitar bloqueios de Tracking Prevention
+      }
+    });
+
+    // 2. REFERÊNCIAS DOS ELEMENTOS
+    const form = document.getElementById('signup-form');
+    const alertSuccess = document.getElementById('alert-success');
+    const alertError = document.getElementById('alert-error');
+    const btnSubmit = document.getElementById('btn-submit');
+
+    // 3. ENVIO DO FORMULÁRIO
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      alertSuccess.classList.add('hidden');
+      alertError.classList.add('hidden');
+      btnSubmit.disabled = true;
+      btnSubmit.innerText = 'Enviando...';
+
+      const nome = document.getElementById('nome').value;
+      const cargo = document.getElementById('cargo').value;
+      const linkCurriculo = document.getElementById('link_curriculo').value;
+      const fotoInput = document.getElementById('foto');
+      const file = fotoInput.files[0];
+
+      try {
+        let fotoUrl = '';
+
+        if (file) {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+          const filePath = `fotos/${fileName}`;
+
+          const { error: uploadError } = await supabaseClient.storage
+            .from('fotos')
+            .upload(filePath, file);
+
+          if (uploadError) throw uploadError;
+
+          const { data: publicUrlData } = supabaseClient.storage
+            .from('fotos')
+            .getPublicUrl(filePath);
+
+          fotoUrl = publicUrlData.publicUrl;
+        }
+
+        const { data, error: insertError } = await supabaseClient
+          .from('aluno')
+          .insert([
+            { 
+              nome: nome, 
+              cargo: cargo, 
+              curriculo_url: linkCurriculo, 
+              foto_url: fotoUrl 
+            }
+          ]);
+
+        if (insertError) throw insertError;
+
+        alertSuccess.classList.remove('hidden');
+        form.reset();
+
+      } catch (error) {
+        console.error('Erro no cadastro:', error);
+        alertError.innerText = error.message || 'Erro ao realizar cadastro.';
+        alertError.classList.remove('hidden');
+      } finally {
+        btnSubmit.disabled = false;
+        btnSubmit.innerText = 'Finalizar Cadastro';
+      }
+    });
+  </script>
+</body>
+</html>
